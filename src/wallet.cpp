@@ -646,7 +646,7 @@ void CWalletTx::GetAmounts(list<pair<CTxDestination, int64> >& listReceived,
     int64 nDebit = GetDebit();
     if (nDebit > 0) // debit>0 means we signed/sent this transaction
     {
-        int64 nValueOut = GetValueOut();
+        int64 nValueOut = GetValueOut(*this);
         nFee = nDebit - nValueOut;
     }
 
@@ -956,7 +956,7 @@ int64 CWallet::GetUnconfirmedBalance() const
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx* pcoin = &(*it).second;
-            if (!pcoin->IsFinal() || !pcoin->IsConfirmed())
+            if (!IsFinalTx(*pcoin) || !pcoin->IsConfirmed())
                 nTotal += pcoin->GetAvailableCredit();
         }
     }
@@ -988,7 +988,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
         {
             const CWalletTx* pcoin = &(*it).second;
 
-            if (!pcoin->IsFinal())
+            if (!IsFinalTx(*pcoin))
                 continue;
 
             if (fOnlyConfirmed && !pcoin->IsConfirmed())
@@ -1217,7 +1217,7 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64> >& vecSend,
                 BOOST_FOREACH (const PAIRTYPE(CScript, int64)& s, vecSend)
                 {
                     CTxOut txout(s.second, s.first);
-                    if (txout.IsDust())
+                    if (txout.IsDust(CTransaction::nMinRelayTxFee))
                     {
                         strFailReason = _("Transaction amount too small");
                         return false;
@@ -1285,7 +1285,7 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64> >& vecSend,
 
                     // Never create dust outputs; if we would, just
                     // add the dust to the fee.
-                    if (newTxOut.IsDust())
+                    if (newTxOut.IsDust(CTransaction::nMinRelayTxFee))
                     {
                         nFeeRet += nChange;
                         reservekey.ReturnKey();
@@ -1324,7 +1324,7 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64> >& vecSend,
 
                 // Check that enough fee is included
                 int64 nPayFee = nTransactionFee * (1 + (int64)nBytes / 1000);
-                bool fAllowFree = CTransaction::AllowFree(dPriority);
+                bool fAllowFree = AllowFree(dPriority);
                 int64 nMinFee = GetMinFee(wtxNew, 1, fAllowFree, GMF_SEND);
                 if (nFeeRet < max(nPayFee, nMinFee))
                 {
@@ -1705,7 +1705,7 @@ std::map<CTxDestination, int64> CWallet::GetAddressBalances()
         {
             CWalletTx *pcoin = &walletEntry.second;
 
-            if (!pcoin->IsFinal() || !pcoin->IsConfirmed())
+            if (!IsFinalTx(*pcoin) || !pcoin->IsConfirmed())
                 continue;
 
             if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0)

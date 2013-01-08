@@ -93,7 +93,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             //
             // Debit
             //
-            int64 nTxFee = nDebit - wtx.GetValueOut();
+            int64 nTxFee = nDebit - GetValueOut(wtx);
 
             for (unsigned int nOut = 0; nOut < wtx.vout.size(); nOut++)
             {
@@ -166,7 +166,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     status.depth = wtx.GetDepthInMainChain();
     status.cur_num_blocks = nBestHeight;
 
-    if (!wtx.IsFinal(nBestHeight + 1))
+    if (!IsFinalTx(wtx, nBestHeight + 1))
     {
         if (wtx.nLockTime < LOCKTIME_THRESHOLD)
         {
