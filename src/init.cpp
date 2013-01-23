@@ -122,7 +122,7 @@ void Shutdown()
     if (pwalletMain)
         bitdb.Flush(true);
     boost::filesystem::remove(GetPidFile());
-    UnregisterWallet(pwalletMain);
+    UnregisterAllWallets();
     if (pwalletMain)
         delete pwalletMain;
     printf("Shutdown : done\n");
