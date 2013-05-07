@@ -11,6 +11,7 @@
 #include "init.h"
 #include "ui_interface.h"
 #include "checkqueue.h"
+#include "chainparams.h"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -36,8 +37,6 @@ unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
 std::vector<CBlockIndex*> vBlockIndexByHeight;
-uint256 hashGenesisBlock("0xb868e0d95a3c3c0e0dadc67ee587aaf9dc8acbf99e3b4b3110fad4eb74c1decc");
-static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); // Reddcoin: starting difficulty is 1 / 2^12
 CBlockIndex* pindexGenesisBlock = NULL;
 int nBestHeight = -1;
 uint256 nBestChainWork = 0;
@@ -205,7 +204,7 @@ void CBlockLocator::Set(const CBlockIndex* pindex)
         if (vHave.size() > 10)
             nStep *= 2;
     }
-    vHave.push_back(hashGenesisBlock);
+    vHave.push_back(Params().HashGenesisBlock());
 }
 
 int CBlockLocator::GetDistanceBack()
@@ -258,7 +257,7 @@ uint256 CBlockLocator::GetBlockHash()
                 return hash;
         }
     }
-    return hashGenesisBlock;
+    return Params().HashGenesisBlock();
 }
 
 int CBlockLocator::GetHeight()
@@ -804,8 +803,8 @@ bool CTxMemPool::accept(CValidationState &state, CTransaction &tx, bool fLimitFr
 
     // Rather not work on nonstandard transactions (unless -testnet)
     string strNonStd;
-    if (!fTestNet && !IsStandardTx(tx, strNonStd))
-        return error("CTxMemPool::accept() : nonstandard transaction type (%s)",
+    if (!TestNet() && !IsStandardTx(tx, strNonStd))
+        return error("CTxMemPool::accept() : nonstandard transaction type",
                      strNonStd.c_str());
 
     // is it already in the memory pool?
@@ -880,7 +879,7 @@ bool CTxMemPool::accept(CValidationState &state, CTransaction &tx, bool fLimitFr
         }
 
         // Check for non-standard pay-to-script-hash in inputs
-        if (!AreInputsStandard(tx, view) && !fTestNet)
+        if (!TestNet() && !AreInputsStandard(tx, view))
             return error("CTxMemPool::accept() : nonstandard transaction input");
 
         // Note: if you modify this code to accept non-standard transactions, then
@@ -1216,7 +1215,7 @@ int64 static GetBlockValue(int nHeight, int64 nFees)
         nSubsidy =  150000 * COIN;
     } else if (nHeight >= 140000) {
       // Subsidy is cut in half every 50,000 blocks starting at block 140000
-      nSubsidy >>= ((nHeight - 140000 + 50000) / 50000);
+      nSubsidy >>= ((nHeight - 140000 + 50000) / Params().SubsidyHalvingInterval());
     }
 
     return nSubsidy + nFees;
@@ -1232,22 +1231,23 @@ static const int64 nInterval = nTargetTimespan / nTargetSpacing;
 //
 unsigned int ComputeMinWork(unsigned int nBase, int64 nTime)
 {
+    const CBigNum &bnLimit = Params().ProofOfWorkLimit();
     // Testnet has min-difficulty blocks
     // after nTargetSpacing*2 time between blocks:
-    if (fTestNet && nTime > nTargetSpacing*2)
-        return bnProofOfWorkLimit.GetCompact();
+    if (TestNet() && nTime > nTargetSpacing*2)
+        return bnLimit.GetCompact();
 
     CBigNum bnResult;
     bnResult.SetCompact(nBase);
-    while (nTime > 0 && bnResult < bnProofOfWorkLimit)
+    while (nTime > 0 && bnResult < bnLimit)
     {
         // Maximum 400% adjustment...
         bnResult *= 4;
         // ... in best-case exactly 4-times-normal target time
         nTime -= nTargetTimespan*4;
     }
-    if (bnResult > bnProofOfWorkLimit)
-        bnResult = bnProofOfWorkLimit;
+    if (bnResult > bnLimit)
+        bnResult = bnLimit;
     return bnResult.GetCompact();
 }
 
@@ -1272,7 +1272,7 @@ unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const CBloc
 
     if (BlockLastSolved == NULL || BlockLastSolved->nHeight == 0 || (uint64)BlockLastSolved->nHeight < PastBlocksMin)
     {
-        return bnProofOfWorkLimit.GetCompact();
+        return Params().ProofOfWorkLimit().GetCompact();
     }
 
     for (unsigned int i = 1; BlockReading && BlockReading->nHeight > 0; i++)
@@ -1339,10 +1339,8 @@ unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const CBloc
         bnNew /= PastRateTargetSeconds;
     }
 
-    if (bnNew > bnProofOfWorkLimit)
-    {
-        bnNew = bnProofOfWorkLimit;
-    }
+    if (bnNew > Params().ProofOfWorkLimit())
+        bnNew = Params().ProofOfWorkLimit();
 
      /// debug print
      printf("Difficulty Retarget - Kimoto Gravity Well\n");
@@ -1379,7 +1377,7 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits)
     bnTarget.SetCompact(nBits);
 
     // Check range
-    if (bnTarget <= 0 || bnTarget > bnProofOfWorkLimit)
+    if (bnTarget <= 0 || bnTarget > Params().ProofOfWorkLimit())
         return error("CheckProofOfWork() : nBits below minimum work");
 
     // Check proof of work matches claimed amount
@@ -1497,7 +1495,7 @@ void UpdateTime(CBlockHeader& block, const CBlockIndex* pindexPrev)
     block.nTime = max(pindexPrev->GetMedianTimePast()+1, GetAdjustedTime());
 
     // Updating time can change work required on testnet:
-    if (fTestNet)
+    if (TestNet())
         block.nBits = GetNextWorkRequired(pindexPrev, &block);
 }
 
@@ -1793,7 +1791,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CBlockIndex* pindex, CCoinsVi
 
     // Special case for the genesis block, skipping connection of its transactions
     // (its coinbase is unspendable)
-    if (GetHash() == hashGenesisBlock) {
+    if (GetHash() == Params().HashGenesisBlock()) {
         view.SetBestBlock(pindex);
         pindexGenesisBlock = pindex;
         return true;
@@ -2320,7 +2318,7 @@ bool CBlock::AcceptBlock(CValidationState &state, CDiskBlockPos *dbp)
     // Get prev block index
     CBlockIndex* pindexPrev = NULL;
     int nHeight = 0;
-    if (hash != hashGenesisBlock) {
+    if (hash != Params().HashGenesisBlock()) {
         map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
         if (mi == mapBlockIndex.end())
             return state.DoS(10, error("AcceptBlock() : prev block not found"));
@@ -2352,8 +2350,8 @@ bool CBlock::AcceptBlock(CValidationState &state, CDiskBlockPos *dbp)
         // Reject block.nVersion=1 blocks when 95% (75% on testnet) of the network has upgraded:
         if (nVersion < 2)
         {
-            if ((!fTestNet && CBlockIndex::IsSuperMajority(2, pindexPrev, 950, 1000)) ||
-                (fTestNet && CBlockIndex::IsSuperMajority(2, pindexPrev, 75, 100)))
+            if ((!TestNet() && CBlockIndex::IsSuperMajority(2, pindexPrev, 950, 1000)) ||
+                (TestNet() && CBlockIndex::IsSuperMajority(2, pindexPrev, 75, 100)))
             {
                 return state.Invalid(error("AcceptBlock() : rejected nVersion=1 block"));
             }
@@ -2362,8 +2360,8 @@ bool CBlock::AcceptBlock(CValidationState &state, CDiskBlockPos *dbp)
         if (nVersion >= 2)
         {
             // if 750 of the last 1,000 blocks are version 2 or greater (51/100 if testnet):
-            if ((!fTestNet && CBlockIndex::IsSuperMajority(2, pindexPrev, 750, 1000)) ||
-                (fTestNet && CBlockIndex::IsSuperMajority(2, pindexPrev, 51, 100)))
+            if ((!TestNet() && CBlockIndex::IsSuperMajority(2, pindexPrev, 750, 1000)) ||
+                (TestNet() && CBlockIndex::IsSuperMajority(2, pindexPrev, 51, 100)))
             {
                 CScript expect = CScript() << nHeight;
                 if (vtx[0].vin[0].scriptSig.size() < expect.size() ||
@@ -2895,21 +2893,9 @@ void UnloadBlockIndex()
 
 bool LoadBlockIndex()
 {
-    if (fTestNet)
-    {
-        pchMessageStart[0] = 0xfe;
-        pchMessageStart[1] = 0xc3;
-        pchMessageStart[2] = 0xb9;
-        pchMessageStart[3] = 0xde;
-        hashGenesisBlock = uint256("0x46db8d519c64586e3f0bf16153f61fdcf1d30b71ab159bf4a5b46dbcbc79d814");
-    }
-
-    //
     // Load block index from databases
-    //
     if (!fReindex && !LoadBlockIndexDB())
         return false;
-
     return true;
 }
 
@@ -2926,47 +2912,9 @@ bool InitBlockIndex() {
 
     // Only add the genesis block if not reindexing (in which case we reuse the one already on disk)
     if (!fReindex) {
-        // Genesis Block:
-        // CBlock(hash=12a765e31ffd4059bada, PoW=0000050c34a64b415b6b, ver=1, hashPrevBlock=00000000000000000000, hashMerkleRoot=97ddfbbae6, nTime=1317972665, nBits=1e0ffff0, nNonce=2084524493, vtx=1)
-        //   CTransaction(hash=97ddfbbae6, ver=1, vin.size=1, vout.size=1, nLockTime=0)
-        //     CTxIn(COutPoint(0000000000, -1), coinbase 04ffff001d0104404e592054696d65732030352f4f63742f32303131205374657665204a6f62732c204170706c65e280997320566973696f6e6172792c2044696573206174203536)
-        //     CTxOut(nValue=50.00000000, scriptPubKey=040184710fa689ad5023690c80f3a4)
-        //   vMerkleTree: 97ddfbbae6
-
-        // Genesis block
-        const char* pszTimestamp = "January 21st 2014 was such a nice day...";
-        CTransaction txNew;
-        txNew.vin.resize(1);
-        txNew.vout.resize(1);
-        txNew.vin[0].scriptSig = CScript() << 486604799 << CBigNum(4) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
-        txNew.vout[0].nValue = 10000 * COIN;
-        txNew.vout[0].scriptPubKey = CScript() << ParseHex("040184710fa689ad5023690c80f3a49c8f13f8d45b8c857fbcbc8bc4a8e4d3eb4b10f4d4604fa08dce601aaf0f470216fe1b51850b4acf21b179c45070ac7b03a9") << OP_CHECKSIG;
-        CBlock block;
-        block.vtx.push_back(txNew);
-        block.hashPrevBlock = 0;
-        block.hashMerkleRoot = block.BuildMerkleTree();
-        block.nVersion = 1;
-        block.nTime    = 1390280400;
-        block.nBits    = 0x1e0ffff0;
-        block.nNonce   = 222583475;
-
-        if (fTestNet)
-        {
-            block.nTime    = 1399544585;
-            block.nNonce   = 1403777;
-        }
-
-        //// debug print
-        uint256 hash = block.GetHash();
-        printf("%s\n", hash.ToString().c_str());
-        printf("%s\n", hashGenesisBlock.ToString().c_str());
-        printf("%s\n", block.hashMerkleRoot.ToString().c_str());
-        assert(block.hashMerkleRoot == uint256("0xb502bc1dc42b07092b9187e92f70e32f9a53247feae16d821bebffa916af79ff"));
-        block.print();
-        assert(hash == hashGenesisBlock);
-
-        // Start new block file
         try {
+            CBlock &block = const_cast<CBlock&>(Params().GenesisBlock());
+            // Start new block file
             unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
             CDiskBlockPos blockPos;
             CValidationState state;
@@ -3083,10 +3031,10 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
             try {
                 // locate a header
                 unsigned char buf[4];
-                blkdat.FindByte(pchMessageStart[0]);
+                blkdat.FindByte(Params().MessageStart()[0]);
                 nRewind = blkdat.GetPos()+1;
                 blkdat >> FLATDATA(buf);
-                if (memcmp(buf, pchMessageStart, 4))
+                if (memcmp(buf, Params().MessageStart(), 4))
                     continue;
                 // read size
                 blkdat >> nSize;
@@ -3229,12 +3177,6 @@ bool static AlreadyHave(const CInv& inv)
 }
 
 
-
-
-// The message start string is designed to be unlikely to occur in normal data.
-// The characters are rarely used upper ASCII, not valid as UTF-8, and produce
-// a large 4-byte int at any alignment.
-unsigned char pchMessageStart[4] = { 0xfb, 0xc0, 0xb6, 0xdb }; // Reddcoin: increase each by adding 2 to bitcoin's value.
 
 
 void static ProcessGetData(CNode* pfrom)
@@ -4012,7 +3954,7 @@ bool ProcessMessages(CNode* pfrom)
         it++;
 
         // Scan for message start
-        if (memcmp(msg.hdr.pchMessageStart, pchMessageStart, sizeof(pchMessageStart)) != 0) {
+        if (memcmp(msg.hdr.pchMessageStart, Params().MessageStart(), MESSAGE_START_SIZE) != 0) {
             printf("\n\nPROCESSMESSAGE: INVALID MESSAGESTART\n\n");
             fOk = false;
             break;
@@ -4729,8 +4671,12 @@ void static ReddcoinMiner(CWallet *pwallet)
     unsigned int nExtraNonce = 0;
 
     try { loop {
-        while (vNodes.empty())
-            MilliSleep(1000);
+        if (Params().NetworkID() != CChainParams::REGTEST) {
+            // Busy-wait for the network to come online so we don't waste time mining
+            // on an obsolete chain. In regtest mode we expect to fly solo.
+            while (vNodes.empty())
+                MilliSleep(1000);
+        }
 
         //
         // Create new block
@@ -4782,6 +4728,12 @@ void static ReddcoinMiner(CWallet *pwallet)
                     SetThreadPriority(THREAD_PRIORITY_NORMAL);
                     CheckWork(pblock, *pwallet, reservekey);
                     SetThreadPriority(THREAD_PRIORITY_LOWEST);
+
+                    // In regression test mode, stop mining after a block is found. This
+                    // allows developers to controllably generate a block on demand.
+                    if (Params().NetworkID() == CChainParams::REGTEST)
+                        throw boost::thread_interrupted();
+
                     break;
                 }
                 pblock->nNonce += 1;
@@ -4821,7 +4773,7 @@ void static ReddcoinMiner(CWallet *pwallet)
 
             // Check for stop or if block needs to be rebuilt
             boost::this_thread::interruption_point();
-            if (vNodes.empty())
+            if (vNodes.empty() && Params().NetworkID() != CChainParams::REGTEST)
                 break;
             if (pblock->nNonce >= 0xffff0000)
                 break;
@@ -4833,7 +4785,7 @@ void static ReddcoinMiner(CWallet *pwallet)
             // Update nTime every few seconds
             UpdateTime(*pblock, pindexPrev);
             nBlockTime = ByteReverse(pblock->nTime);
-            if (fTestNet)
+            if (TestNet())
             {
                 // Changing pblock->nTime can change work required on testnet:
                 nBlockBits = ByteReverse(pblock->nBits);
@@ -4853,8 +4805,12 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet)
     static boost::thread_group* minerThreads = NULL;
 
     int nThreads = GetArg("-genproclimit", -1);
-    if (nThreads < 0)
-        nThreads = boost::thread::hardware_concurrency();
+    if (nThreads < 0) {
+        if (Params().NetworkID() == CChainParams::REGTEST)
+            nThreads = 1;
+        else
+            nThreads = boost::thread::hardware_concurrency();
+    }
 
     if (minerThreads != NULL)
     {
