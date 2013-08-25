@@ -385,8 +385,6 @@ bool AppInit2(boost::thread_group& threadGroup)
 
     // ********************************************************* Step 2: parameter interactions
 
-    Checkpoints::fEnabled = GetBoolArg("-checkpoints", true);
-
     fBloomFilters = GetBoolArg("-bloomfilters", true);
     if (fBloomFilters)
         nLocalServices |= NODE_BLOOM;
@@ -439,6 +437,7 @@ bool AppInit2(boost::thread_group& threadGroup)
     fDebug = GetBoolArg("-debug", false);
     fBenchmark = GetBoolArg("-benchmark", false);
     mempool.fChecks = GetBoolArg("-checkmempool", RegTest());
+    Checkpoints::fEnabled = GetBoolArg("-checkpoints", true);
 
     // -par=0 means autodetect, but nScriptCheckThreads==0 means no concurrency
     nScriptCheckThreads = GetArg("-par", 0);
