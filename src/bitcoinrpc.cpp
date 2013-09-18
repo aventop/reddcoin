@@ -806,12 +806,12 @@ void StartRPCThreads()
         filesystem::path pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
         if (!pathCertFile.is_complete()) pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
         if (filesystem::exists(pathCertFile)) rpc_ssl_context->use_certificate_chain_file(pathCertFile.string());
-        else printf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string().c_str());
+        else LogPrintf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string().c_str());
 
         filesystem::path pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
         if (!pathPKFile.is_complete()) pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
         if (filesystem::exists(pathPKFile)) rpc_ssl_context->use_private_key_file(pathPKFile.string(), ssl::context::pem);
-        else printf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string().c_str());
+        else LogPrintf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string().c_str());
 
         string strCiphers = GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
         SSL_CTX_set_cipher_list(rpc_ssl_context->impl(), strCiphers.c_str());
@@ -942,7 +942,7 @@ void JSONRequest::parse(const Value& valRequest)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
     strMethod = valMethod.get_str();
     if (strMethod != "getwork" && strMethod != "getworkex" && strMethod != "getblocktemplate")
-        printf("ThreadRPCServer method=%s\n", strMethod.c_str());
+        LogPrint("rpc", "ThreadRPCServer method=%s\n", strMethod.c_str());
 
     // Parse params
     Value valParams = find_value(request, "params");
@@ -1016,7 +1016,7 @@ void ServiceConnection(AcceptedConnection *conn)
         }
         if (!HTTPAuthorized(mapHeaders))
         {
-            printf("ThreadRPCServer incorrect password attempt from %s\n", conn->peer_address_to_string().c_str());
+            LogPrintf("ThreadRPCServer incorrect password attempt from %s\n", conn->peer_address_to_string().c_str());
             /* Deter brute-forcing short passwords.
                If this results in a DoS the user really
                shouldn't have their RPC port exposed. */
@@ -1339,7 +1339,7 @@ int main(int argc, char *argv[])
     {
         if (argc >= 2 && string(argv[1]) == "-server")
         {
-            printf("server ready\n");
+            LogPrintf("server ready\n");
             ThreadRPCServer(NULL);
         }
         else
