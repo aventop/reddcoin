@@ -71,9 +71,6 @@ CScript COINBASE_FLAGS;
 
 const string strMessageMagic = "Reddcoin Signed Message:\n";
 
-double dHashesPerSec = 0.0;
-int64 nHPSTimerStart = 0;
-
 // Settings
 int64 nTransactionFee = 0;
 int64 nMinimumInputValue = DUST_HARD_LIMIT;
