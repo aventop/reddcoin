@@ -16,10 +16,7 @@ using namespace std;
 // or from the last difficulty change if 'lookup' is nonpositive.
 // If 'height' is nonnegative, compute the estimate at the time when a given block was found.
 Value GetNetworkHashPS(int lookup, int height) {
-    CBlockIndex *pb = pindexBest;
-
-    if (height >= 0 && height < nBestHeight)
-        pb = FindBlockByHeight(height);
+    CBlockIndex *pb = chainActive[height];
 
     if (pb == NULL || !pb->nHeight)
         return 0;
@@ -139,7 +136,7 @@ Value getmininginfo(const Array& params, bool fHelp)
             "Returns an object containing mining-related information.");
 
     Object obj;
-    obj.push_back(Pair("blocks",           (int)nBestHeight));
+    obj.push_back(Pair("blocks",           (int)chainActive.Height()));
     obj.push_back(Pair("currentblocksize", (uint64_t)nLastBlockSize));
     obj.push_back(Pair("currentblocktx",   (uint64_t)nLastBlockTx));
     obj.push_back(Pair("difficulty",       (double)GetDifficulty()));
@@ -180,10 +177,10 @@ Value getworkex(const Array& params, bool fHelp)
         static CBlockIndex* pindexPrev;
         static int64 nStart;
         static CBlockTemplate* pblocktemplate;
-        if (pindexPrev != pindexBest ||
+        if (pindexPrev != chainActive.Tip() ||
             (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60))
         {
-            if (pindexPrev != pindexBest)
+            if (pindexPrev != chainActive.Tip())
             {
                 // Deallocate old blocks since they're obsolete now
                 mapNewBlock.clear();
@@ -195,9 +192,9 @@ Value getworkex(const Array& params, bool fHelp)
             // Clear pindexPrev so future getworks make a new block, despite any failures from here on
             pindexPrev = NULL;
 
-            // Store the pindexBest used before CreateNewBlock, to avoid races
+            // Store the chainActive.Tip() used before CreateNewBlock, to avoid races
             nTransactionsUpdatedLast = nTransactionsUpdated;
-            CBlockIndex* pindexPrevNew = pindexBest;
+            CBlockIndex* pindexPrevNew = chainActive.Tip();
             nStart = GetTime();
 
             // Create new block
@@ -319,10 +316,10 @@ Value getwork(const Array& params, bool fHelp)
         static CBlockIndex* pindexPrev;
         static int64 nStart;
         static CBlockTemplate* pblocktemplate;
-        if (pindexPrev != pindexBest ||
+        if (pindexPrev != chainActive.Tip() ||
             (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60))
         {
-            if (pindexPrev != pindexBest)
+            if (pindexPrev != chainActive.Tip())
             {
                 // Deallocate old blocks since they're obsolete now
                 mapNewBlock.clear();
@@ -334,9 +331,9 @@ Value getwork(const Array& params, bool fHelp)
             // Clear pindexPrev so future getworks make a new block, despite any failures from here on
             pindexPrev = NULL;
 
-            // Store the pindexBest used before CreateNewBlock, to avoid races
+            // Store the chainActive.Tip() used before CreateNewBlock, to avoid races
             nTransactionsUpdatedLast = nTransactionsUpdated;
-            CBlockIndex* pindexPrevNew = pindexBest;
+            CBlockIndex* pindexPrevNew = chainActive.Tip();
             nStart = GetTime();
 
             // Create new block
@@ -455,15 +452,15 @@ Value getblocktemplate(const Array& params, bool fHelp)
     static CBlockIndex* pindexPrev;
     static int64 nStart;
     static CBlockTemplate* pblocktemplate;
-    if (pindexPrev != pindexBest ||
+    if (pindexPrev != chainActive.Tip() ||
         (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 5))
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = NULL;
 
-        // Store the pindexBest used before CreateNewBlock, to avoid races
+        // Store the chainActive.Tip() used before CreateNewBlock, to avoid races
         nTransactionsUpdatedLast = nTransactionsUpdated;
-        CBlockIndex* pindexPrevNew = pindexBest;
+        CBlockIndex* pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
         // Create new block
