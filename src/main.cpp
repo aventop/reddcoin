@@ -51,6 +51,7 @@ bool fReindex = false;
 bool fBenchmark = false;
 bool fTxIndex = false;
 unsigned int nCoinCacheSize = 5000;
+int64 nChainStartTime = 1400969700; // Sat May 24 22:15:00 2014 GMT
 
 /** Fees smaller than this (in satoshi) are considered zero fee (for transaction creation) */
 int64 CTransaction::nMinTxFee = 100000;
@@ -1081,6 +1082,28 @@ uint256 static GetOrphanRoot(const CBlockHeader* pblock)
         pblock = mapOrphanBlocks[pblock->hashPrevBlock];
     return pblock->GetHash();
 }
+
+// increasing Nfactor gradually
+const unsigned char minNfactor = 10;
+const unsigned char maxNfactor = 30;
+
+unsigned char GetNfactor(int64 nTimestamp) {
+    int64 s = nTimestamp - nChainStartTime;
+
+    if (s <= 0)
+        return minNfactor;
+
+    // Nfactor increases by 1 every 3 months
+    int64 l = 365 * 24 * 60 * 60 / 4;
+    int n = minNfactor + 1 + s / l;
+
+    if (n > 255)
+        printf( "GetNfactor(%lld) - something wrong(n = %d)\n", nTimestamp, n );
+
+    unsigned char N = (unsigned char) n;
+    return min(max(N, minNfactor), maxNfactor);
+}
+
 
 int64 static GetBlockValue(int nHeight, int64 nFees)
 {
@@ -4681,12 +4704,19 @@ void static ReddcoinMiner(CWallet *pwallet)
         loop
         {
             unsigned int nHashesDone = 0;
-
             uint256 thash;
-            char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
+            unsigned long int scrypt_scratpad_size_current_block = ((1 << GetNfactor(pblock->nTime)) * 128) + 63;
+            char scratchpad[scrypt_scratpad_size_current_block];
+
+            /*printf("nTime -> %d", pblock->nTime);
+            printf("scrypt_scratpad_size_current_block -> %ld", sizeof(scrypt_scratpad_size_current_block));
+            printf("scratchpad -> %d", sizeof(scratchpad));*/
+
             loop
             {
-                scrypt_1024_1_1_256_sp(BEGIN(pblock->nVersion), BEGIN(thash), scratchpad);
+
+                // Generic scrypt
+                scrypt_N_1_1_256_sp_generic(BEGIN(pblock->nVersion), BEGIN(thash), scratchpad, GetNfactor(pblock->nTime));
 
                 if (thash <= hashTarget)
                 {
