@@ -304,7 +304,6 @@ bool AreInputsStandard(const CTransaction& tx, CCoinsViewCache& mapInputs);
 unsigned int GetLegacySigOpCount(const CTransaction& tx);
 
 /** Count ECDSA signature operations in pay-to-script-hash inputs.
->>>>>>> 05df3fc... Removed AcceptToMemoryPool method from CTransaction. This method belongs to the mempool instance.
 
     @param[in] mapInputs	Map of previous transactions that have outputs we're spending
     @return maximum number of sigops required to validate this transaction's inputs
