@@ -7,6 +7,7 @@
 #include "wallet.h"
 #include "miner.h"
 #include "main.h"
+#include "scrypt.h"
 
 
 
