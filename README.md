@@ -28,7 +28,7 @@ will replace Proof-of-Work (PoW) in second half of 2014.
  - FAQs paper: http://www.reddcoin.com/papers/PoSV_FAQ.pdf
 
 For more information, as well as an immediately useable, binary version of
-the Reddcoin client sofware, see http://www.reddcoin.com.
+the Reddcoin client software, see http://www.reddcoin.com.
 
 License
 -------
