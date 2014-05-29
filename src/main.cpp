@@ -1222,7 +1222,7 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos)
     }
 
     // Check the header
-    if (block.GetBlockTime() > CHECK_POW_FROM_NTIME && !CheckProofOfWork(block.GetHash(), block.nBits))
+    if (block.GetBlockTime() > CHECK_POW_FROM_NTIME && !CheckProofOfWork(block.GetPoWHash(), block.nBits))
         return error("ReadBlockFromDisk(CBlock&, CDiskBlockPos&) : errors in block header");
 
     return true;
@@ -2311,7 +2311,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
         return state.DoS(100, error("CheckBlock() : size limits failed"));
 
     // Check proof of work matches claimed amount
-    if (block.GetBlockTime() > CHECK_POW_FROM_NTIME && fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits))
+    if (block.GetBlockTime() > CHECK_POW_FROM_NTIME && fCheckPOW && !CheckProofOfWork(block.GetPoWHash(), block.nBits))
         return state.DoS(50, error("CheckBlock() : proof of work failed"));
 
     // Check timestamp
