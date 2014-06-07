@@ -1325,9 +1325,8 @@ int64 GetBlockValue(int nHeight, int64 nFees)
     return nSubsidy + nFees;
 }
 
-static const int64 nTargetTimespan = 60 * 60; // Reddcoin: Not used
+static const int64 nTargetTimespan = 60 * 60;
 static const int64 nTargetSpacing = 60; // Reddcoin: 1 minute block
-static const int64 nInterval = nTargetTimespan / nTargetSpacing;
 
 //
 // minimum amount of work that could possibly be required nTime after
@@ -1360,8 +1359,6 @@ unsigned int KimotoGravityWell(const CBlockIndex* pindexLast, const CBlockHeader
     /* current difficulty formula, megacoin - kimoto gravity well */
     const CBlockIndex  *BlockLastSolved = pindexLast;
     const CBlockIndex  *BlockReading    = pindexLast;
-    const CBlockHeader *BlockCreating   = pblock;
-    BlockCreating                       = BlockCreating;
 
     uint64  PastBlocksMass              = 0;
     int64   PastRateActualSeconds       = 0;
@@ -1457,6 +1454,10 @@ unsigned int KimotoGravityWell(const CBlockIndex* pindexLast, const CBlockHeader
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock)
 {
+    // always mine at the lowest diff on testnet
+    if (TestNet())
+        return Params().ProofOfWorkLimit().GetCompact();
+
     static const int64 BlocksTargetSpacing = 1 * 60; // 1 Minute
     unsigned int       TimeDaySeconds      = 60 * 60 * 24;
 
