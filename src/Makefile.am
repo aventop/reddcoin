@@ -58,7 +58,7 @@ reddcoind_SOURCES = bitcoind.cpp
 #
 
 if TARGET_WINDOWS
-bitcoind_SOURCES += bitcoin-res.rc
+reddcoind_SOURCES += bitcoin-res.rc
 endif
 
 AM_CPPFLAGS += $(BDB_CPPFLAGS)
@@ -71,7 +71,7 @@ leveldb/%.a:
 	  CC="$(CC)" PLATFORM=$(TARGET_OS) AR="$(AR)" $(LEVELDB_TARGET_FLAGS) \
 	  OPT="$(CXXFLAGS) $(CPPFLAGS)"
 
-qt/bitcoinstrings.cpp: $(libbitcoin_a_SOURCES)
+qt/bitcoinstrings.cpp: $(libreddcoin_a_SOURCES)
 	@test -n $(XGETTEXT) || echo "xgettext is required for updating translations"
 	@cd $(top_srcdir); XGETTEXT=$(XGETTEXT) share/qt/extract_strings_qt.py
 

@@ -36,6 +36,6 @@ test_reddcoin_SOURCES = accounting_tests.cpp alert_tests.cpp \
   transaction_tests.cpp uint160_tests.cpp uint256_tests.cpp util_tests.cpp \
   wallet_tests.cpp $(JSON_TEST_FILES) $(RAW_TEST_FILES)
 
-nodist_test_bitcoin_SOURCES = $(BUILT_SOURCES)
+nodist_test_reddcoin_SOURCES = $(BUILT_SOURCES)
 
 CLEANFILES = *.gcda *.gcno $(BUILT_SOURCES)
